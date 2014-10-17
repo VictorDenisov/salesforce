@@ -2,7 +2,7 @@ module Salesforce.Utils
 ( deriveJson
 ) where
 
-import Data.Char (isUpper)
+import Data.Char (isUpper, toLower)
 import Data.List (intercalate)
 import Data.List.Split (split, whenElt, keepDelimsL)
 import Language.Haskell.TH (Dec, Name, Q)
@@ -15,4 +15,5 @@ deriveJson = J.deriveJSON $
                         }
 
 customModifier :: String -> String
-customModifier = (intercalate "_") . split (keepDelimsL $ whenElt isUpper)
+customModifier = (map toLower) . (intercalate "_") . splitCamel
+  where splitCamel = split (keepDelimsL $ whenElt isUpper)
