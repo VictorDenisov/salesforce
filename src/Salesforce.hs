@@ -31,9 +31,9 @@ import Salesforce.Token (Token(..))
 
 data Config = Config { baseUrl :: String }
 
-data Error = TimeoutError
-           | NoResourceError
-           | BadRequestError String
+data Error = Timeout
+           | NoResource
+           | BadRequest String
            | InternalError String
            | UnknownError String
              deriving (Typeable, Show)
@@ -75,10 +75,10 @@ runRequest request = do
 
   case () of _
               | sc `elem` [200..299] -> return ()
-              | sc == 400 -> throwM $ BadRequestError ""
-              | sc == 404 -> throwM $ NoResourceError
+              | sc == 400 -> throwM $ BadRequest ""
+              | sc == 404 -> throwM $ NoResource
               | sc == 409 -> return ()
-              | sc == 502 -> throwM $ TimeoutError
+              | sc == 502 -> throwM $ Timeout
               | sc `elem` [502..599] -> throwM $ InternalError ""
               | otherwise -> throwM $ UnknownError ""
 
@@ -92,7 +92,7 @@ handleExceptionsAndResult monad = do
     Right x -> return x
 
 handleHttpException :: HttpException -> IO (Either Error a)
-handleHttpException ResponseTimeout = return $ Left $ TimeoutError
+handleHttpException ResponseTimeout = return $ Left $ Timeout
 handleHttpException e               = return $ Left $ UnknownError $ show e
 
 handleOtherExceptions :: SomeException -> IO (Either Error a)
