@@ -21,6 +21,7 @@ import Control.Monad.Logger (MonadLogger, logInfo)
 import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Trans (MonadIO(..))
 import qualified Data.ByteString as BS
+import Data.IORef (IORef, newIORef)
 import Data.Maybe (fromMaybe)
 import Data.String.Here (i)
 import Data.Text (Text)
@@ -45,7 +46,7 @@ instance Exception Error
 data RuntimeState = RuntimeState
                       { config            :: Config
                       , connectionManager :: H.Manager
-                      , token             :: Token
+                      , token             :: IORef (Maybe Token)
                       }
 
 type SalesforceT m = ReaderT RuntimeState m
@@ -106,4 +107,5 @@ handleOtherExceptions e = return $ Left $ UnknownError $ show e
 mkRuntimeState :: Config -> IO RuntimeState
 mkRuntimeState config = do
   manager <- H.newManager tlsManagerSettings
-  return $ RuntimeState config manager (Token "" "" "" "" "" "")
+  tokenRef <- newIORef Nothing
+  return $ RuntimeState config manager tokenRef
