@@ -17,6 +17,7 @@ import Control.Exception (SomeException, Handler(..), catches)
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow(..), Exception(..))
 import Control.Monad.Catch.Pure (CatchT(..))
+import Control.Monad.Logger (MonadLogger, logInfo)
 import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Trans (MonadIO(..))
 import qualified Data.ByteString as BS
@@ -28,6 +29,7 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Conduit as H
 import Network.HTTP.Types (statusCode)
 import Salesforce.Token (Token(..))
+import Salesforce.HTTP (showResponse, showRequest)
 
 data Config = Config { baseUrl :: String }
 
@@ -51,7 +53,8 @@ type SalesforceT m = ReaderT RuntimeState m
 runSalesforceT :: Monad m => RuntimeState -> SalesforceT m a -> m a
 runSalesforceT c f = runReaderT f c
 
-login :: (MonadIO m, MonadThrow m) => BS.ByteString -> BS.ByteString -> SalesforceT m ()
+login :: (MonadIO m, MonadLogger m, MonadThrow m)
+      => BS.ByteString -> BS.ByteString -> SalesforceT m ()
 login username password = do
   let body = [ ("grant_type", "password")
              , ("client_id", "3MVG9y6x0357Hlef_t5.O2puWQwv6.U9fuSvygsduJclfnczbowHK_ol6_SjMAbj4NPvl9aqmDTiTLB4Co0fj")
@@ -62,7 +65,7 @@ login username password = do
   request <- H.urlEncodedBody body `liftM` parseUrl "https://login.salesforce.com/services/oauth2/token"
   runRequest request
 
-runRequest :: (MonadIO m, MonadThrow m)
+runRequest :: (MonadIO m, MonadLogger m, MonadThrow m)
            => H.Request -> SalesforceT m ()
 runRequest request = do
   let request' = request { checkStatus = \_ _ _ -> Nothing
@@ -70,6 +73,8 @@ runRequest request = do
   manager <- asks connectionManager
 
   response <- handleExceptionsAndResult $ H.httpLbs request' manager
+
+  $logInfo [i|Sent request: ${showRequest request'}, received ${showResponse response}|]
 
   let sc = statusCode (responseStatus response)
 
