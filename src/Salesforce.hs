@@ -46,12 +46,10 @@ data RuntimeState = RuntimeState
                       , token             :: Token
                       }
 
-type SalesforceT m = ReaderT RuntimeState (CatchT m)
+type SalesforceT m = ReaderT RuntimeState m
 
-runSalesforceT :: Monad m => RuntimeState -> SalesforceT m a -> m (Either Error a)
-runSalesforceT c f = runCatchT (runReaderT f c) >>= return . (either (Left . exceptionToError) Right)
-  where exceptionToError :: SomeException -> Error
-        exceptionToError e = fromMaybe (UnknownError $ show e) $ fromException e
+runSalesforceT :: Monad m => RuntimeState -> SalesforceT m a -> m a
+runSalesforceT c f = runReaderT f c
 
 login :: (MonadIO m, MonadThrow m) => BS.ByteString -> BS.ByteString -> SalesforceT m ()
 login username password = do
