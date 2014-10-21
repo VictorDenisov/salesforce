@@ -20,8 +20,10 @@ import Control.Monad.Catch.Pure (CatchT(..))
 import Control.Monad.Logger (MonadLogger, logInfo)
 import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Trans (MonadIO(..))
+import Data.Aeson (eitherDecode)
 import qualified Data.ByteString as BS
-import Data.IORef (IORef, newIORef)
+import qualified Data.ByteString.Lazy as LBS
+import Data.IORef (IORef, newIORef, writeIORef)
 import Data.Maybe (fromMaybe)
 import Data.String.Here (i)
 import Data.Text (Text)
@@ -64,10 +66,17 @@ login username password = do
              , ("password", password)
              ]
   request <- H.urlEncodedBody body `liftM` parseUrl "https://login.salesforce.com/services/oauth2/token"
-  runRequest request
+
+  response <- runRequest request
+  tokenRef <- asks token
+  case eitherDecode $ responseBody response of
+    Left  e -> throwM $ InternalError e
+    Right t -> liftIO $ writeIORef tokenRef $ Just t
+
+  return ()
 
 runRequest :: (MonadIO m, MonadLogger m, MonadThrow m)
-           => H.Request -> SalesforceT m ()
+           => H.Request -> SalesforceT m (Response LBS.ByteString)
 runRequest request = do
   let request' = request { checkStatus = \_ _ _ -> Nothing
                          }
@@ -80,10 +89,10 @@ runRequest request = do
   let sc = statusCode (responseStatus response)
 
   case () of _
-              | sc `elem` [200..299] -> return ()
+              | sc `elem` [200..299] -> return response
               | sc == 400 -> throwM $ BadRequest ""
               | sc == 404 -> throwM $ NoResource
-              | sc == 409 -> return ()
+              | sc == 409 -> return response
               | sc == 502 -> throwM $ Timeout
               | sc `elem` [502..599] -> throwM $ InternalError ""
               | otherwise -> throwM $ UnknownError ""
